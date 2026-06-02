@@ -1,0 +1,7 @@
+fastapi>=0.136
+uvicorn[standard]>=0.48
+neo4j>=6.2
+aiokafka>=0.14.0
+pytest>=9.0
+pytest-asyncio>=1.4.0
+httpx>=0.28
