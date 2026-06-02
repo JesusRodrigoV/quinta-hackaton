@@ -20,9 +20,94 @@ services:
     networks:
       - urbanflow-net
 
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: kafka_urbanflow
+    ports:
+      - "9092:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - kafka-urbanflow-data:/var/lib/kafka/data
+    networks:
+      - urbanflow-net
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: kafka_init_urbanflow
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        kafka-topics --bootstrap-server kafka:9092 \
+          --create \
+          --if-not-exists \
+          --topic bus-location-updated \
+          --partitions 3 \
+          --replication-factor 1
+    networks:
+      - urbanflow-net
+
+  telemetry-tracking-service:
+    build:
+      context: ./backend/telemetry-tracking-service
+      dockerfile: Dockerfile
+    container_name: telemetry_tracking_service
+    env_file:
+      - ./backend/telemetry-tracking-service/.env
+    environment:
+      APP_ENV: docker
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TIMESCALEDB_HOST: timescaledb
+      TIMESCALEDB_PORT: 5432
+    ports:
+      - "8000:8000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - urbanflow-net
+
 networks:
   urbanflow-net:
     driver: bridge
 
 volumes:
   timescaledb-telemetry-data:
+  kafka-urbanflow-data:

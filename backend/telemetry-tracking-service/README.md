@@ -5,7 +5,27 @@ Microservicio FastAPI para recibir telemetria GPS de buses, persistirla en Times
 ## Ejecutar localmente
 
 ```powershell
-docker compose up -d timescaledb
+docker compose up -d --build
+```
+
+La API quedara disponible en `http://localhost:8000`.
+
+Para ver logs del microservicio:
+
+```powershell
+docker compose logs -f telemetry-tracking-service
+```
+
+Para detener todo:
+
+```powershell
+docker compose down
+```
+
+## Ejecutar solo la app fuera de Docker
+
+```powershell
+docker compose up -d timescaledb kafka kafka-init
 cd backend/telemetry-tracking-service
 python -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -13,7 +33,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Kafka debe estar disponible en `localhost:9092`.
+Kafka queda disponible en `localhost:9092` y TimescaleDB en `localhost:5433`.
 
 ## Variables principales
 
@@ -54,6 +74,15 @@ SELECT create_hypertable('bus_telemetry', 'timestamp', if_not_exists => TRUE);
 - `GET /health`: estado basico del proceso.
 - `GET /ready`: valida conectividad a TimescaleDB y Kafka.
 - `POST /api/v1/telemetry`: persiste telemetria y publica el evento.
+
+Ejemplo de prueba:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:8000/api/v1/telemetry `
+  -ContentType "application/json" `
+  -Body '{"bus_id":"BUS-102","latitude":-16.4897,"longitude":-68.1193,"speed_kmh":42.5,"timestamp":"2026-06-02T19:00:00Z"}'
+```
 
 ## Robustez
 
