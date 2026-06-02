@@ -1,0 +1,23 @@
+# docker-compose.yml
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb_telemetry
+    environment:
+      POSTGRES_USER: urbanflow_user
+      POSTGRES_PASSWORD: dev_password_123
+      POSTGRES_DB: telemetry_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb-telemetry-data:/var/lib/postgresql/data
+      - ./backend/telemetry-tracking-service/database/init.sql:/docker-entrypoint-initdb.d/001-init-telemetry.sql:ro
+    networks:
+      - urbanflow-net
+
+networks:
+  urbanflow-net:
+    driver: bridge
+
+volumes:
+  timescaledb-telemetry-data:
