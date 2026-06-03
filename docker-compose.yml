@@ -1,4 +1,3 @@
-# docker-compose.yml
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg15
@@ -104,6 +103,55 @@ services:
     networks:
       - urbanflow-net
 
+  neo4j:
+    image: neo4j:2026.05-community
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/password
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - urbanflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
+      interval: 5s
+      retries: 15
+      start_period: 10s
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest-fips
+    ports:
+      - "9093:9092" # <-- ¡CORRECCIÓN! Cambiado el host a 9093 para no chocar con Kafka
+    command:
+      - redpanda
+      - start
+      - --mode dev-container
+    healthcheck:
+      test: rpk cluster info
+      interval: 5s
+      retries: 15
+      start_period: 10s
+    networks:
+      - urbanflow-net
+    restart: unless-stopped
+
+  routing-service:
+    build: ./routing-service
+    ports:
+      - "8001:8000" # <-- ¡CORRECCIÓN! Cambiado el host a 8001 para no chocar con telemetry-tracking-service
+    env_file: ./routing-service/.env
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - urbanflow-net
+    restart: unless-stopped
+    volumes:
+      - ./routing-service:/app
+
 networks:
   urbanflow-net:
     driver: bridge
@@ -111,3 +159,4 @@ networks:
 volumes:
   timescaledb-telemetry-data:
   kafka-urbanflow-data:
+  neo4j_data:
