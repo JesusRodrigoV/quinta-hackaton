@@ -46,17 +46,18 @@ services:
     networks:
       - urbanflow-net
 
-  redpanda:
-    image: docker.redpanda.com/redpandadata/redpanda:latest
-    container_name: redpanda_urbanflow
+  redis:
+    image: redis:alpine
+    container_name: redis_signals
     ports:
-      - "9093:9092"
-    command:
-      - redpanda
-      - start
-      - --mode dev-container
+      - "6379:6379"
     networks:
       - urbanflow-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   neo4j:
     image: neo4j:latest
@@ -119,12 +120,12 @@ services:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
-      KAFKA_BROKER: redpanda:9092
+      KAFKA_BROKER: kafka:9092
     depends_on:
       neo4j:
         condition: service_healthy
-      redpanda:
-        condition: service_started
+      kafka:
+        condition: service_healthy
     networks:
       - urbanflow-net
 
@@ -142,6 +143,31 @@ services:
       mongo:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+    networks:
+      - urbanflow-net
+
+  traffic-light-service:
+    build:
+      context: ./ms-traffic-light
+    container_name: traffic_light_service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: audit-db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: audit_admin
+      POSTGRES_PASSWORD: audit_password_123
+      POSTGRES_DATABASE: audit_db
+    ports:
+      - "8004:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      audit-db:
         condition: service_healthy
     networks:
       - urbanflow-net
