@@ -19,12 +19,15 @@ docker compose up --build
 
 ### routing-service (`:8001`)
 
-- `POST /api/v1/routes` — Planificar ruta multimodal
-- `GET /api/v1/stops`  — Listar paradas
-- `GET /api/v1/health` — Health check
+- `POST /api/v1/routes`   — Planificar ruta multimodal
+- `GET  /api/v1/routes/{id}` — Obtener ruta cacheada
+- `GET  /api/v1/stops`    — Listar paradas
+- `GET  /api/v1/buses`    — Posiciones en vivo de los buses (desde Kafka)
+- `GET  /api/v1/buses/{bus_id}` — Posición de un bus específico
+- `GET  /api/v1/health`   — Health check
 
-### telemetry-tracking-service (`:8000`)
+### Telemetría (Kafka)
 
-- `POST /telemetry` — Recibir telemetría de buses
-- `GET  /health`    — Health check
-- `GET  /ready`     — Readiness check
+El routing-service consume del topic `bus-location-updated` para mantener
+posiciones actualizadas de los buses en memoria. No requiere TimescaleDB ni
+el telemetry-tracking-service para funcionar.

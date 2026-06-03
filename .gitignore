@@ -9,3 +9,7 @@ env/
 .env
 .env.local
 !.env.example
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
