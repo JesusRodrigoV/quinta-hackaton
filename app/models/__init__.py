@@ -1,0 +1,1 @@
+from app.models.prediction import PredictionLog
