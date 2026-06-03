@@ -100,6 +100,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       TIMESCALEDB_HOST: timescaledb
       TIMESCALEDB_PORT: 5432
+      KAFKA_TOPIC_BUS_LOCATION_UPDATED: bus-location-updated
     ports:
       - "8000:8000"
     depends_on:
@@ -121,6 +122,7 @@ services:
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
       KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC_BUS_LOCATION_UPDATED: bus-location-updated
     depends_on:
       neo4j:
         condition: service_healthy
@@ -160,6 +162,9 @@ services:
       POSTGRES_USER: audit_admin
       POSTGRES_PASSWORD: audit_password_123
       POSTGRES_DATABASE: audit_db
+      KAFKA_TOPIC_BUS_DELAYED: tracking.bus.delayed
+      KAFKA_TOPIC_CONGESTION_ALERT: congestion.alert.created
+      KAFKA_TOPIC_SIGNAL_REROUTE: signal.reroute.confirmed
     ports:
       - "8004:8000"
     depends_on:
