@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # --- INFRAESTRUCTURA CORE ---
 
@@ -46,6 +48,18 @@ services:
     networks:
       - urbanflow-net
 
+  # Interfaz gráfica de Kafka (Aportación de Natalia)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka_ui_urbanflow
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - urbanflow-net
+
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest-fips
     container_name: redpanda_urbanflow
@@ -82,9 +96,11 @@ services:
       interval: 10s
       retries: 10
 
+  # Mongo con configuración de Replica Set (Aportación de Natalia)
   mongo:
-    image: mongo:latest
+    image: mongo:7.0
     container_name: mongo_mobility
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
@@ -96,6 +112,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mongo-init:
+    image: mongo:7.0
+    container_name: mongo_init_mobility
+    depends_on:
+      - mongo
+    networks:
+      - urbanflow-net
+    entrypoint: ["/bin/sh", "-c", "sleep 5; mongosh --host mongo:27017 --eval \"rs.initiate({_id: 'rs0', members: [{_id:0, host: 'mongo:27017'}]})\" || true"]
 
   # --- MICROSERVICIOS DE LA HACKATON ---
 
@@ -151,6 +176,7 @@ services:
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: mobility_hub
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_CLIENT_ID: mobility-hub-service # Variable extraída de la rama de Natalia
     ports:
       - "8002:8000"
     depends_on:

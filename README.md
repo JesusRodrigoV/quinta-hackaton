@@ -1,3 +1,4 @@
+
 # Quinta Hackaton — UrbanFlow Technologies
 
 Plataforma Inteligente de Movilidad Urbana.
@@ -11,10 +12,15 @@ Plataforma Inteligente de Movilidad Urbana.
 
 ## Cómo levantar
 
+# Mobility Hub Service (UrbanFlow Tech)
+
+FastAPI service implementing shared mobility vehicle reservations, ride lifecycle, and event publishing to Kafka.
+
+Quick Start (requires Docker & Docker Compose):
+
 ```bash
 docker compose up --build
 ```
-
 ## Endpoints
 
 ### routing-service (`:8001`)
@@ -28,3 +34,6 @@ docker compose up --build
 - `POST /telemetry` — Recibir telemetría de buses
 - `GET  /health`    — Health check
 - `GET  /ready`     — Readiness check
+
+The API will be available at http://localhost:8000. Health at `/health`.
+# Quinta hackaton
