@@ -1,0 +1,8 @@
+fastapi==0.99.1
+uvicorn[standard]==0.22.0
+motor==4.0.0
+aiokafka==0.8.0
+pydantic==2.7.0
+pydantic-settings==2.0.2
+apscheduler==3.10.1
+bson==0.5.10

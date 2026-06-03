@@ -73,7 +73,22 @@ services:
       interval: 10s
       retries: 10
 
-  # --- MICROSERVICIOS DE ANDRES ---
+  mongo:
+    image: mongo:latest
+    container_name: mongo_mobility
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - urbanflow-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- MICROSERVICIOS DE LA HACKATON ---
 
   telemetry-tracking-service:
     build:
@@ -112,6 +127,63 @@ services:
     networks:
       - urbanflow-net
 
+  shared-mobility-service:
+    build:
+      context: ./ms-shared-mobility
+    container_name: shared_mobility_service
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: mobility_hub
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8002:8000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - urbanflow-net
+
+  audit-service:
+    build:
+      context: ./ms-audit
+    container_name: audit_service
+    environment:
+      POSTGRES_USER: audit_admin
+      POSTGRES_PASSWORD: audit_password_123
+      POSTGRES_HOST: audit-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: audit_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC_REROUTE: signal.reroute.confirmed
+      KAFKA_TOPIC_TARIFF: payment.tariff.changed
+      SECRET_CRYPTO_SALT: hackathon_secret_salt
+    ports:
+      - "8003:8000"
+    depends_on:
+      audit-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - urbanflow-net
+
+  audit-db:
+    image: postgres:15-alpine
+    container_name: audit_db_regulatory
+    environment:
+      POSTGRES_USER: audit_admin
+      POSTGRES_PASSWORD: audit_password_123
+      POSTGRES_DB: audit_db
+    networks:
+      - urbanflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U audit_admin -d audit_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # --- NUESTRO PAYMENT SERVICE ---
 
   payment-db:
@@ -127,7 +199,8 @@ services:
       - urbanflow-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d payments_db"]
-      interval: 5s
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   payment-app:
@@ -155,3 +228,4 @@ volumes:
   timescaledb-telemetry-data:
   kafka-urbanflow-data:
   neo4j_data:
+  mongo_data:
