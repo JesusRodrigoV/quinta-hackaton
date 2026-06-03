@@ -37,4 +37,8 @@ async def health():
             await session.run("RETURN 1")
         return {"status": "healthy", "service": "routing-service"}
     except Exception as e:
-        return {"status": "unhealthy", "error": str(e)}
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "error": str(e)},
+        )

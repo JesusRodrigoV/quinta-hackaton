@@ -1,4 +1,36 @@
 services:
+  neo4j:
+    image: neo4j:2026.05-community
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/password
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - urbanflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
+      interval: 5s
+      retries: 15
+      start_period: 10s
+
+  routing-service:
+    build: ./backend/routing-service
+    ports:
+      - "8001:8000"
+    env_file: ./backend/routing-service/.env
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - urbanflow-net
+    restart: unless-stopped
+    volumes:
+      - ./backend/routing-service:/app
+
   timescaledb:
     image: timescale/timescaledb:latest-pg15
     container_name: timescaledb_telemetry
@@ -74,6 +106,8 @@ services:
       context: ./backend/telemetry-tracking-service
       dockerfile: Dockerfile
     container_name: telemetry_tracking_service
+    ports:
+      - "8000:8000"
     env_file:
       - ./backend/telemetry-tracking-service/.env
     environment:
@@ -81,8 +115,6 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       TIMESCALEDB_HOST: timescaledb
       TIMESCALEDB_PORT: 5432
-    ports:
-      - "8000:8000"
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -103,28 +135,10 @@ services:
     networks:
       - urbanflow-net
 
-  neo4j:
-    image: neo4j:2026.05-community
-    ports:
-      - "7687:7687"
-      - "7474:7474"
-    environment:
-      NEO4J_AUTH: neo4j/password
-    volumes:
-      - neo4j_data:/data
-    networks:
-      - urbanflow-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
-      interval: 5s
-      retries: 15
-      start_period: 10s
-
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:latest-fips
     ports:
-      - "9093:9092" # <-- ¡CORRECCIÓN! Cambiado el host a 9093 para no chocar con Kafka
+      - "9093:9092"
     command:
       - redpanda
       - start
@@ -137,20 +151,6 @@ services:
     networks:
       - urbanflow-net
     restart: unless-stopped
-
-  routing-service:
-    build: ./routing-service
-    ports:
-      - "8001:8000" # <-- ¡CORRECCIÓN! Cambiado el host a 8001 para no chocar con telemetry-tracking-service
-    env_file: ./routing-service/.env
-    depends_on:
-      neo4j:
-        condition: service_healthy
-    networks:
-      - urbanflow-net
-    restart: unless-stopped
-    volumes:
-      - ./routing-service:/app
 
 networks:
   urbanflow-net:

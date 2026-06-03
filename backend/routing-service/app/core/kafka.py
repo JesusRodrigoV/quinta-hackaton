@@ -36,7 +36,10 @@ async def init_kafka():
 
 async def close_kafka():
     if _producer:
-        await _producer.stop()
+        try:
+            await asyncio.wait_for(_producer.stop(), timeout=_TIMEOUT)
+        except Exception:
+            logger.warning("Kafka producer stop timed out — forcing close")
         set_producer(None)
 
 

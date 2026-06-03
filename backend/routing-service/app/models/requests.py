@@ -3,6 +3,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 ALLOWED_MODES = {"bus", "metro", "walk", "scooter"}
 ALLOWED_PREFERENCES = {"time", "cost", "co2"}
+SANTIAGO_MIN_LAT = -33.47
+SANTIAGO_MAX_LAT = -33.43
+SANTIAGO_MIN_LON = -70.67
+SANTIAGO_MAX_LON = -70.64
 
 
 class RouteRequest(BaseModel):
@@ -44,4 +48,18 @@ class RouteRequest(BaseModel):
         dlon = abs(self.origin_lon - self.dest_lon)
         if dlat < 0.001 and dlon < 0.001:
             raise ValueError("Origen y destino deben ser puntos diferentes")
+        return self
+
+    @model_validator(mode="after")
+    def validate_in_santiago(self):
+        for label, lat, lon in [
+            ("Origen", self.origin_lat, self.origin_lon),
+            ("Destino", self.dest_lat, self.dest_lon),
+        ]:
+            if not (SANTIAGO_MIN_LAT <= lat <= SANTIAGO_MAX_LAT
+                    and SANTIAGO_MIN_LON <= lon <= SANTIAGO_MAX_LON):
+                raise ValueError(
+                    f"{label}: las coordenadas ({lat}, {lon}) están fuera del "
+                    f"área de cobertura (Santiago, Chile)",
+                )
         return self

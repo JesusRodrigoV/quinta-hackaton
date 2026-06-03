@@ -9,8 +9,7 @@ def test_station_info_required_fields():
 
 
 def test_station_info_rejects_missing_type():
-    try:
+    from pydantic import ValidationError
+    import pytest
+    with pytest.raises(ValidationError):
         StationInfo(station_id="x", name="X")
-        assert False, "should have raised"
-    except Exception:
-        pass

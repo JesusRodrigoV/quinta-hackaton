@@ -53,6 +53,8 @@ async def _paths_between(start_id: str, end_id: str, modes: list[str]):
                       -[r:CONNECTS_TO*..6]->
                       (end:Station {station_id: $end_id})
             WHERE ALL(rel IN r WHERE rel.transport_mode IN $modes)
+              AND ALL(n IN nodes(p) WHERE
+                  size([m IN nodes(p) WHERE m.station_id = n.station_id]) = 1)
             WITH p,
                  reduce(t = 0, rel IN relationships(p) | t + rel.average_travel_time_sec) AS total_sec
             RETURN p, total_sec
@@ -151,7 +153,11 @@ async def plan_route(request: RouteRequest) -> RouteResponse:
     origin_stations = await _nearest_stations(request.origin_lat, request.origin_lon)
     dest_stations = await _nearest_stations(request.dest_lat, request.dest_lon)
     if not origin_stations or not dest_stations:
-        raise HTTPException(404, "No stations found near origin or destination")
+        raise HTTPException(
+            404,
+            "Las coordenadas proporcionadas no están cerca de ninguna estación de la red. "
+            "Asegúrate de que estén dentro del área de cobertura (Santiago, Chile)",
+        )
     all_options = []
     for o_station in origin_stations[:2]:
         for d_station in dest_stations[:2]:
