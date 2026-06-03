@@ -1,4 +1,6 @@
 services:
+  # --- INFRAESTRUCTURA CORE ---
+  
   timescaledb:
     image: timescale/timescaledb:latest-pg15
     container_name: timescaledb_telemetry
@@ -13,9 +15,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    volumes:
-      - timescaledb-telemetry-data:/var/lib/postgresql/data
-      - ./backend/telemetry-tracking-service/database/init.sql:/docker-entrypoint-initdb.d/001-init-telemetry.sql:ro
     networks:
       - urbanflow-net
 
@@ -23,61 +22,64 @@ services:
     image: confluentinc/cp-kafka:7.7.1
     container_name: kafka_urbanflow
     ports:
-      - "9092:9094"
+      - "9092:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093,EXTERNAL://0.0.0.0:9094
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 20s
-    volumes:
-      - kafka-urbanflow-data:/var/lib/kafka/data
     networks:
       - urbanflow-net
 
-  kafka-init:
-    image: confluentinc/cp-kafka:7.7.1
-    container_name: kafka_init_urbanflow
-    depends_on:
-      kafka:
-        condition: service_healthy
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: redpanda_urbanflow
+    ports:
+      - "9093:9092"
     command:
-      - /bin/sh
-      - -c
-      - |
-        kafka-topics --bootstrap-server kafka:9092 \
-          --create \
-          --if-not-exists \
-          --topic bus-location-updated \
-          --partitions 3 \
-          --replication-factor 1
+      - redpanda
+      - start
+      - --mode dev-container
     networks:
       - urbanflow-net
+
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j_routing
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/password
+    networks:
+      - urbanflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
+      interval: 10s
+      retries: 10
+
+  # --- MICROSERVICIOS DE ANDRES ---
 
   telemetry-tracking-service:
     build:
       context: ./backend/telemetry-tracking-service
-      dockerfile: Dockerfile
     container_name: telemetry_tracking_service
-    env_file:
-      - ./backend/telemetry-tracking-service/.env
     environment:
-      APP_ENV: docker
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       TIMESCALEDB_HOST: timescaledb
       TIMESCALEDB_PORT: 5432
@@ -88,69 +90,62 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     networks:
       - urbanflow-net
-
-  neo4j:
-    image: neo4j:2026.05-community
-    ports:
-      - "7687:7687"
-      - "7474:7474"
-    environment:
-      NEO4J_AUTH: neo4j/password
-    volumes:
-      - neo4j_data:/data
-    networks:
-      - urbanflow-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
-      interval: 5s
-      retries: 15
-      start_period: 10s
-
-  redpanda:
-    image: docker.redpanda.com/redpandadata/redpanda:latest-fips
-    ports:
-      - "9093:9092" # <-- ¡CORRECCIÓN! Cambiado el host a 9093 para no chocar con Kafka
-    command:
-      - redpanda
-      - start
-      - --mode dev-container
-    healthcheck:
-      test: rpk cluster info
-      interval: 5s
-      retries: 15
-      start_period: 10s
-    networks:
-      - urbanflow-net
-    restart: unless-stopped
 
   routing-service:
-    build: ./routing-service
+    build:
+      context: ./routing-service
+    container_name: routing_service
     ports:
-      - "8001:8000" # <-- ¡CORRECCIÓN! Cambiado el host a 8001 para no chocar con telemetry-tracking-service
-    env_file: ./routing-service/.env
+      - "8001:8000"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: password
+      KAFKA_BROKER: redpanda:9092
     depends_on:
       neo4j:
         condition: service_healthy
+      redpanda:
+        condition: service_started
     networks:
       - urbanflow-net
-    restart: unless-stopped
+
+  # --- NUESTRO PAYMENT SERVICE ---
+
+  payment-db:
+    image: postgres:15-alpine
+    container_name: payment_db_acid
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: payments_db
     volumes:
-      - ./routing-service:/app
+      - ./ms-unified-payment/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - urbanflow-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d payments_db"]
+      interval: 5s
+      retries: 5
+
+  payment-app:
+    build:
+      context: ./ms-unified-payment
+    container_name: payment_service_app
+    environment:
+      DB_HOST: payment-db
+      DB_USER: admin
+      DB_PASS: secret
+      DB_NAME: payments_db
+    ports:
+      - "3000:3000"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    networks:
+      - urbanflow-net
 
 networks:
   urbanflow-net:
