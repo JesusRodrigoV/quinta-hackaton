@@ -1,16 +1,25 @@
+# Ignores combinados (quenta + Andres)
+
+# Node.js
+node_modules/
+dist/
+build/
+*.log
+
+# Python (Andres)
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
+*.egg-info/
+.pytest_cache/
 
+# Entornos virtuales
 .venv/
 venv/
 env/
 
+# Environment
 .env
 .env.local
 !.env.example
-
-.pytest_cache/
-*.egg-info/
-dist/
