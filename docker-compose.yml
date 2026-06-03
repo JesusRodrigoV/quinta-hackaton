@@ -68,6 +68,7 @@ services:
       NEO4J_AUTH: neo4j/password
     networks:
       - urbanflow-net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
       interval: 10s
@@ -176,6 +177,8 @@ services:
       POSTGRES_USER: audit_admin
       POSTGRES_PASSWORD: audit_password_123
       POSTGRES_DB: audit_db
+    ports:
+      - "5434:5432"
     networks:
       - urbanflow-net
     healthcheck:
@@ -193,6 +196,8 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: payments_db
+    ports:
+      - "5432:5432"
     volumes:
       - ./ms-unified-payment/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
